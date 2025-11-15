@@ -12,24 +12,44 @@ const api = axios.create({
 // Intercepteur pour ajouter le token JWT aux requêtes
 api.interceptors.request.use(
   (config) => {
-    config.headers = config.headers || {};
+    const headers = config.headers ?? {};
+
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    if (config.data instanceof FormData) {
-      const contentTypeHeader = Object.keys(config.headers).find(
-        (key) => key.toLowerCase() === 'content-type'
-      );
-      if (
-        contentTypeHeader &&
-        config.headers[contentTypeHeader]?.toLowerCase() === 'application/json'
-      ) {
-        delete config.headers[contentTypeHeader];
+      if (typeof headers.set === 'function') {
+        headers.set('Authorization', `Bearer ${token}`);
+      } else {
+        headers.Authorization = `Bearer ${token}`;
       }
-    } else if (config.method && config.method.toLowerCase() !== 'get') {
-      config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
     }
+
+    const method = config.method?.toLowerCase();
+    const isFormData = config.data instanceof FormData;
+
+    if (isFormData) {
+      if (typeof headers.delete === 'function') {
+        headers.delete('Content-Type');
+      } else {
+        Object.keys(headers).forEach((key) => {
+          if (key.toLowerCase() === 'content-type') {
+            delete headers[key];
+          }
+        });
+      }
+    } else if (method && method !== 'get') {
+      if (typeof headers.set === 'function') {
+        const hasContentType =
+          (typeof headers.has === 'function' && headers.has('Content-Type')) ||
+          (typeof headers.get === 'function' && !!headers.get('Content-Type'));
+        if (!hasContentType) {
+          headers.set('Content-Type', 'application/json');
+        }
+      } else if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+        headers['Content-Type'] = 'application/json';
+      }
+    }
+
+    config.headers = headers;
     return config;
   },
   (error) => {
@@ -114,15 +134,11 @@ export const adminEmployeesAPI = {
  getEmployeeAvailability: (employeeId) => api.get(`/admin/employees/${employeeId}/availability`),
  addEmployeeAvailability: (employeeId, availabilityData) => api.post(`/admin/employees/${employeeId}/availability`, availabilityData),
  deleteEmployeeAvailability: (availabilityId) => api.delete(`/admin/availability/${availabilityId}`),
- uploadEmployeePhoto: (employeeId, photoFile) => {
-   const formData = new FormData();
-   formData.append('photo', photoFile);
-   return api.post(`/admin/employees/${employeeId}/upload-photo`, formData, {
-     headers: {
-       'Content-Type': 'multipart/form-data',
-     },
-   });
- },
+  uploadEmployeePhoto: (employeeId, photoFile) => {
+    const formData = new FormData();
+    formData.append('photo', photoFile);
+    return api.post(`/admin/employees/${employeeId}/upload-photo`, formData);
+  },
 };
 
 // ===== ADMIN - CLIENTS =====
@@ -170,11 +186,7 @@ export const adminGalleryAPI = {
     if (title) {
       formData.append('title', title);
     }
-    return api.post('/admin/gallery/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return api.post('/admin/gallery/upload', formData);
   },
 };
 
