@@ -3,6 +3,7 @@ import { Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AdminLayout from '../../components/AdminLayout';
 import { adminGalleryAPI } from '../../services/api';
+import { getMediaUrl } from '@/utils/media';
 
 export default function Gallery() {
   const [images, setImages] = useState([]);
@@ -89,7 +90,7 @@ export default function Gallery() {
             <div key={image.id} className="bg-white rounded-lg shadow-md overflow-hidden group">
               <div className="relative aspect-square">
                 <img
-                  src={image.image_url}
+                  src={getMediaUrl(image.image_url)}
                   alt={image.title || 'Image galerie'}
                   className="w-full h-full object-cover"
                   onError={(e) => {
