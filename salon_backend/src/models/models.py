@@ -243,7 +243,7 @@ class SalonInfo(db.Model):
     cancellation_policy = db.Column(db.Text)
     
     def to_dict(self):
-        return {
+        data = {
             'id': self.id,
             'name': self.name,
             'description': self.description,
@@ -253,6 +253,23 @@ class SalonInfo(db.Model):
             'logo_url': self.logo_url,
             'cancellation_policy': self.cancellation_policy
         }
+
+        optional_fields = [
+            'city',
+            'postal_code',
+            'country',
+            'website',
+            'facebook_url',
+            'instagram_url',
+            'booking_advance_days',
+            'booking_cancel_hours',
+            'slot_duration'
+        ]
+
+        for field in optional_fields:
+            data[field] = getattr(self, field, None)
+
+        return data
 
 class Gallery(db.Model):
     __tablename__ = 'gallery'
