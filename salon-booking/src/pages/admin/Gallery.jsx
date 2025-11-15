@@ -8,6 +8,7 @@ import { getMediaUrl } from '@/utils/media';
 export default function Gallery() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [newImage, setNewImage] = useState({
     file: null,
@@ -19,12 +20,24 @@ export default function Gallery() {
     fetchImages();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (newImage.preview) {
+        URL.revokeObjectURL(newImage.preview);
+      }
+    };
+  }, [newImage.preview]);
+
   const fetchImages = async () => {
     try {
+      setLoading(true);
+      setError('');
       const response = await adminGalleryAPI.getGallery();
-      setImages(response.data);
+      const gallery = Array.isArray(response?.data) ? response.data : [];
+      setImages(gallery);
     } catch (error) {
       console.error('Erreur:', error);
+      setError("Impossible de charger la galerie. Veuillez réessayer.");
     } finally {
       setLoading(false);
     }
@@ -37,12 +50,21 @@ export default function Gallery() {
       return;
     }
     try {
-      await adminGalleryAPI.uploadGalleryPhoto(newImage.file, newImage.title);
-      fetchImages();
+      const { data } = await adminGalleryAPI.uploadGalleryPhoto(newImage.file, newImage.title);
+      const createdImage = data?.gallery_item;
+      if (createdImage) {
+        setImages(prev => [createdImage, ...prev]);
+      } else {
+        await fetchImages();
+      }
       setShowModal(false);
+      if (newImage.preview) {
+        URL.revokeObjectURL(newImage.preview);
+      }
       setNewImage({ file: null, title: '', preview: '' });
     } catch (error) {
       console.error('Erreur:', error);
+      alert("Erreur lors du téléversement de l'image");
     }
   };
 
@@ -51,9 +73,10 @@ export default function Gallery() {
     
     try {
       await adminGalleryAPI.deleteImage(id);
-      fetchImages();
+      setImages(prev => prev.filter(image => image.id !== id));
     } catch (error) {
       console.error('Erreur:', error);
+      alert("Impossible de supprimer cette image");
     }
   };
 
@@ -75,6 +98,12 @@ export default function Gallery() {
           Ajouter une image
         </Button>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {images.length === 0 ? (
         <div className="text-center py-12">
@@ -137,9 +166,12 @@ export default function Gallery() {
                   onChange={(e) => {
                     const file = e.target.files[0];
                     if (file) {
+                      if (newImage.preview) {
+                        URL.revokeObjectURL(newImage.preview);
+                      }
                       setNewImage({
-                        ...newImage,
                         file,
+                        title: newImage.title,
                         preview: URL.createObjectURL(file)
                       });
                     }
@@ -175,6 +207,9 @@ export default function Gallery() {
                   type="button"
                   variant="outline"
                   onClick={() => {
+                    if (newImage.preview) {
+                      URL.revokeObjectURL(newImage.preview);
+                    }
                     setShowModal(false);
                     setNewImage({ file: null, title: '', preview: '' });
                   }}

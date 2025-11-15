@@ -7,6 +7,19 @@ from datetime import time
 from werkzeug.utils import secure_filename
 from src.cache import cache
 
+
+def clear_gallery_cache():
+    """Invalidate the cached public gallery."""
+    try:
+        from src.routes.salon import get_gallery
+    except ImportError:
+        get_gallery = None
+
+    if get_gallery:
+        cache.delete_memoized(get_gallery)
+    else:
+        cache.clear()
+
 admin_bp = Blueprint('admin', __name__)
 
 def is_admin():
@@ -827,10 +840,12 @@ def add_gallery_image():
             title=data.get('title'),
             display_order=data.get('display_order', 0)
         )
-        
+
         db.session.add(gallery_item)
         db.session.commit()
-        
+
+        clear_gallery_cache()
+
         return jsonify({
             'message': 'Image ajoutée',
             'gallery_item': gallery_item.to_dict()
@@ -856,7 +871,9 @@ def delete_gallery_image(gallery_id):
         
         db.session.delete(gallery_item)
         db.session.commit()
-        
+
+        clear_gallery_cache()
+
         return jsonify({'message': 'Image supprimée'}), 200
         
     except Exception as e:
@@ -899,6 +916,8 @@ def upload_gallery_photo():
         )
         db.session.add(new_image)
         db.session.commit()
+
+        clear_gallery_cache()
 
         return jsonify({
             'message': 'Image téléversée avec succès',
