@@ -9,74 +9,74 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
+const isAxiosHeaders = (headers) => typeof headers?.set === 'function';
+
+const setHeaderValue = (headers, key, value) => {
+  if (!headers) {
+    return;
+  }
+
+  if (isAxiosHeaders(headers)) {
+    headers.set(key, value);
+  } else {
+    headers[key] = value;
+  }
+};
+
+const deleteHeader = (headers, key) => {
+  if (!headers) {
+    return;
+  }
+
+  if (isAxiosHeaders(headers)) {
+    headers.delete(key);
+    return;
+  }
+
+  const lowerKey = key.toLowerCase();
+  Object.keys(headers).forEach((existingKey) => {
+    if (existingKey.toLowerCase() === lowerKey) {
+      delete headers[existingKey];
+    }
+  });
+};
+
 // Intercepteur pour ajouter le token JWT aux requêtes
 api.interceptors.request.use(
   (config) => {
-    const headers = config.headers ?? {};
-
-    const normalizeKey = (key) =>
-      Object.keys(headers).find((existingKey) => existingKey.toLowerCase() === key.toLowerCase()) || key;
-
-    const setHeader = (key, value) => {
-      if (typeof headers.set === 'function') {
-        headers.set(key, value);
-      } else {
-        headers[normalizeKey(key)] = value;
-      }
-    };
-
-    const hasHeader = (key) => {
-      if (typeof headers.has === 'function') {
-        return headers.has(key);
-      }
-      return Object.keys(headers).some((existingKey) => existingKey.toLowerCase() === key.toLowerCase());
-    };
-
-    const getHeader = (key) => {
-      if (typeof headers.get === 'function') {
-        return headers.get(key);
-      }
-      const normalizedKey = normalizeKey(key);
-      return headers[normalizedKey];
-    };
-
-    const removeHeader = (key) => {
-      if (typeof headers.delete === 'function') {
-        headers.delete(key);
-      } else {
-        const normalizedKey = normalizeKey(key);
-        if (normalizedKey in headers) {
-          delete headers[normalizedKey];
-        }
-      }
-    };
+    config.headers = config.headers ?? {};
 
     const token = localStorage.getItem('token');
     if (token) {
-      setHeader('Authorization', `Bearer ${token}`);
+      setHeaderValue(config.headers, 'Authorization', `Bearer ${token}`);
     }
 
     const method = config.method?.toLowerCase();
     const isFormData = config.data instanceof FormData;
 
     if (isFormData) {
-      const contentType = getHeader('Content-Type');
-      if (!contentType || contentType.toLowerCase().includes('application/json')) {
-        removeHeader('Content-Type');
-      }
+      deleteHeader(config.headers, 'Content-Type');
     } else if (method && method !== 'get') {
-      if (!hasHeader('Content-Type')) {
-        setHeader('Content-Type', 'application/json');
-      }
+      setHeaderValue(config.headers, 'Content-Type', 'application/json');
     }
 
-    config.headers = headers;
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
+
+const postMultipart = (url, buildFormData) => {
+  const formData = new FormData();
+  buildFormData(formData);
+
+  return api.post(url, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
 
 // ===== AUTHENTIFICATION =====
 
@@ -159,15 +159,10 @@ export const adminEmployeesAPI = {
     api.post(`/admin/employees/${employeeId}/availability`, availabilityData),
   deleteEmployeeAvailability: (availabilityId) =>
     api.delete(`/admin/availability/${availabilityId}`),
-  uploadEmployeePhoto: (employeeId, photoFile) => {
-    const formData = new FormData();
-    formData.append('photo', photoFile);
-    return api.post(`/admin/employees/${employeeId}/upload-photo`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
+  uploadEmployeePhoto: (employeeId, photoFile) =>
+    postMultipart(`/admin/employees/${employeeId}/upload-photo`, (formData) => {
+      formData.append('photo', photoFile);
+    }),
 };
 
 // ===== ADMIN - CLIENTS =====
@@ -209,18 +204,13 @@ export const adminHoursAPI = {
 export const adminGalleryAPI = {
   getGallery: () => api.get('/admin/gallery'),
   deleteImage: (id) => api.delete(`/admin/gallery/${id}`),
-  uploadGalleryPhoto: (photoFile, title) => {
-    const formData = new FormData();
-    formData.append('photo', photoFile);
-    if (title) {
-      formData.append('title', title);
-    }
-    return api.post('/admin/gallery/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
+  uploadGalleryPhoto: (photoFile, title) =>
+    postMultipart('/admin/gallery/upload', (formData) => {
+      formData.append('photo', photoFile);
+      if (title) {
+        formData.append('title', title);
+      }
+    }),
 };
 
 // ===== ADMIN - STATISTIQUES =====
