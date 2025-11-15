@@ -7,17 +7,20 @@ const API_BASE_URL = '/api';
 // Créer une instance axios avec la configuration de base
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Intercepteur pour ajouter le token JWT aux requêtes
 api.interceptors.request.use(
   (config) => {
+    config.headers = config.headers || {};
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    } else if (config.method && config.method.toLowerCase() !== 'get') {
+      config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
     }
     return config;
   },
