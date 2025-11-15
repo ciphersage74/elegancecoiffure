@@ -1,69 +1,127 @@
 import { useState, useEffect } from 'react';
-import { Save, Building2, Mail, Phone, MapPin } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Save, Building2, Phone, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button.jsx';
 import AdminLayout from '../../components/AdminLayout';
+import { salonAPI, adminSalonAPI } from '@/services/api';
+
+const DEFAULT_SETTINGS = {
+  name: '',
+  description: '',
+  address: '',
+  city: '',
+  postal_code: '',
+  country: '',
+  phone: '',
+  email: '',
+  website: '',
+  facebook_url: '',
+  instagram_url: '',
+  booking_advance_days: 30,
+  booking_cancel_hours: 24,
+  slot_duration: 30,
+  logo_url: ''
+};
+
+const coerceNumber = (value, fallback) => {
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeSettings = (data = {}) => ({
+  ...DEFAULT_SETTINGS,
+  name: data.name ?? DEFAULT_SETTINGS.name,
+  description: data.description ?? DEFAULT_SETTINGS.description,
+  address: data.address ?? DEFAULT_SETTINGS.address,
+  city: data.city ?? DEFAULT_SETTINGS.city,
+  postal_code: data.postal_code ?? DEFAULT_SETTINGS.postal_code,
+  country: data.country ?? DEFAULT_SETTINGS.country,
+  phone: data.phone ?? DEFAULT_SETTINGS.phone,
+  email: data.email ?? DEFAULT_SETTINGS.email,
+  website: data.website ?? DEFAULT_SETTINGS.website,
+  facebook_url: data.facebook_url ?? DEFAULT_SETTINGS.facebook_url,
+  instagram_url: data.instagram_url ?? DEFAULT_SETTINGS.instagram_url,
+  booking_advance_days: coerceNumber(
+    data.booking_advance_days,
+    DEFAULT_SETTINGS.booking_advance_days
+  ),
+  booking_cancel_hours: coerceNumber(
+    data.booking_cancel_hours,
+    DEFAULT_SETTINGS.booking_cancel_hours
+  ),
+  slot_duration: coerceNumber(
+    data.slot_duration,
+    DEFAULT_SETTINGS.slot_duration
+  ),
+  logo_url: data.logo_url ?? DEFAULT_SETTINGS.logo_url
+});
 
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState({
-    name: '',
-    description: '',
-    address: '',
-    city: '',
-    postal_code: '',
-    country: '',
-    phone: '',
-    email: '',
-    website: '',
-    facebook_url: '',
-    instagram_url: '',
-    booking_advance_days: 30,
-    booking_cancel_hours: 24,
-    slot_duration: 30,
-    logo_url: ''
-  });
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS }));
 
   useEffect(() => {
-    fetchSettings();
-  }, []);
+    let isMounted = true;
 
-  const fetchSettings = async () => {
-    try {
-      const response = await fetch('/api/salon/info');
-      const data = await response.json();
-      if (data) {
-        setSettings(data);
+    const loadSettings = async () => {
+      try {
+        const response = await salonAPI.getInfo();
+        const data = response?.data;
+        const nextSettings = data ? normalizeSettings(data) : { ...DEFAULT_SETTINGS };
+
+        if (isMounted) {
+          setSettings(nextSettings);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des paramètres:', error);
+        if (isMounted) {
+          setSettings({ ...DEFAULT_SETTINGS });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    
-    try {
-      const response = await fetch('/api/admin/salon-info', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(settings)
-      });
 
-      if (response.ok) {
-        alert('Paramètres enregistrés avec succès !');
-      } else {
-        alert('Erreur lors de l\'enregistrement');
+    try {
+      const payload = {
+        ...settings,
+        booking_advance_days: coerceNumber(
+          settings.booking_advance_days,
+          DEFAULT_SETTINGS.booking_advance_days
+        ),
+        booking_cancel_hours: coerceNumber(
+          settings.booking_cancel_hours,
+          DEFAULT_SETTINGS.booking_cancel_hours
+        ),
+        slot_duration: coerceNumber(
+          settings.slot_duration,
+          DEFAULT_SETTINGS.slot_duration
+        )
+      };
+
+      const { data } = await adminSalonAPI.updateInfo(payload);
+
+      if (data?.salon_info) {
+        setSettings(normalizeSettings(data.salon_info));
       }
+
+      alert('Paramètres enregistrés avec succès !');
     } catch (error) {
-      console.error('Erreur:', error);
-      alert('Erreur lors de l\'enregistrement');
+      console.error('Erreur lors de l\'enregistrement des paramètres:', error);
+      alert("Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
     }
@@ -80,10 +138,10 @@ export default function Settings() {
   return (
     <AdminLayout>
       <div className="p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Paramètres du Salon</h1>
+        <h1 className="text-3xl font-bold mb-6">Paramètres du Salon</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Informations générales */}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Informations générales */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center mb-4">
             <Building2 className="w-6 h-6 text-amber-600 mr-2" />
@@ -316,13 +374,13 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button type="submit" disabled={saving} className="px-8">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
-          </Button>
-        </div>
-      </form>
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saving} className="px-8">
+              <Save className="w-4 h-4 mr-2" />
+              {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            </Button>
+          </div>
+        </form>
       </div>
     </AdminLayout>
   );

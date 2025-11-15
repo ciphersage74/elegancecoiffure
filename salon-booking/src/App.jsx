@@ -25,7 +25,8 @@ import Booking from './pages/Booking'
 import Register from './pages/Register'
 import MyAppointments from './pages/MyAppointments'
 import AuthChoice from './pages/AuthChoice'
-import { employeesAPI } from './services/api'
+import { employeesAPI, salonAPI } from './services/api'
+import { getMediaUrl } from '@/utils/media'
 
 // Composant de protection des routes admin
 function ProtectedRoute({ children }) {
@@ -52,6 +53,7 @@ function HomePage() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { user, logout } = useAuth()
   const [teamMembers, setTeamMembers] = useState([])
+  const [galleryImages, setGalleryImages] = useState([])
 
   useEffect(() => {
     const fetchTeam = async () => {
@@ -65,6 +67,33 @@ function HomePage() {
     }
     fetchTeam()
   }, [])
+
+  useEffect(() => {
+    const fetchGallery = async () => {
+      try {
+        const response = await salonAPI.getGallery()
+        setGalleryImages(response.data || [])
+      } catch (error) {
+        console.error('Erreur lors du chargement de la galerie:', error)
+      }
+    }
+
+    fetchGallery()
+  }, [])
+
+  const fallbackGallery = [
+    { id: 'fallback-1', image_url: salonInterior1, title: 'Salon Élégance', isLocal: true },
+    { id: 'fallback-2', image_url: salonInterior2, title: 'Espace Beauté', isLocal: true },
+    { id: 'fallback-3', image_url: salonInterior3, title: 'Ambiance Lounge', isLocal: true }
+  ]
+
+  const useFallback = galleryImages.length === 0
+
+  const galleryItems = (useFallback ? fallbackGallery : galleryImages).map((item, index) => ({
+    id: item.id ?? `gallery-${index}`,
+    title: item.title,
+    src: item.isLocal || useFallback ? item.image_url : getMediaUrl(item.image_url)
+  }))
 
   return (
     <div className="min-h-screen bg-white">
@@ -262,9 +291,21 @@ function HomePage() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[salonInterior1, salonInterior2, salonInterior3].map((img, index) => (
-              <div key={index} className="relative overflow-hidden rounded-lg group cursor-pointer h-64">
-                <img src={img} alt={`Galerie ${index + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+            {galleryItems.map((item, index) => (
+              <div key={item.id || index} className="relative overflow-hidden rounded-lg group cursor-pointer h-64">
+                <img
+                  src={item.src}
+                  alt={item.title || `Galerie ${index + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = [salonInterior1, salonInterior2, salonInterior3][index % 3]
+                  }}
+                />
+                {item.title && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-sm px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {item.title}
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300"></div>
               </div>
             ))}

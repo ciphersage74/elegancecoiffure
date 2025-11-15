@@ -73,9 +73,12 @@ export const appointmentsAPI = {
 
 export const salonAPI = {
   getInfo: () => api.get('/salon/info'),
-  updateInfo: (salonData) => api.put('/salon/info', salonData),
   getGallery: () => api.get('/salon/gallery'),
   getHours: () => api.get('/salon/hours'),
+};
+
+export const adminSalonAPI = {
+  updateInfo: (salonData) => api.put('/admin/salon-info', salonData),
 };
 
 // ===== ADMIN - SERVICES =====
@@ -149,7 +152,6 @@ export const adminHoursAPI = {
 
 export const adminGalleryAPI = {
   getGallery: () => api.get('/admin/gallery'),
-  addImage: (imageData) => api.post('/admin/gallery', imageData),
   deleteImage: (id) => api.delete(`/admin/gallery/${id}`),
   uploadGalleryPhoto: (photoFile, title) => {
     const formData = new FormData();
@@ -157,11 +159,7 @@ export const adminGalleryAPI = {
     if (title) {
       formData.append('title', title);
     }
-    return api.post('/admin/gallery/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return api.post('/admin/gallery/upload', formData);
   },
 };
 
