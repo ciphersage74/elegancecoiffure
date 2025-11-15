@@ -7,17 +7,20 @@ const API_BASE_URL = '/api';
 // Créer une instance axios avec la configuration de base
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Intercepteur pour ajouter le token JWT aux requêtes
 api.interceptors.request.use(
   (config) => {
+    config.headers = config.headers || {};
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    } else if (config.method && config.method.toLowerCase() !== 'get') {
+      config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/json';
     }
     return config;
   },
@@ -73,9 +76,12 @@ export const appointmentsAPI = {
 
 export const salonAPI = {
   getInfo: () => api.get('/salon/info'),
-  updateInfo: (salonData) => api.put('/salon/info', salonData),
   getGallery: () => api.get('/salon/gallery'),
   getHours: () => api.get('/salon/hours'),
+};
+
+export const adminSalonAPI = {
+  updateInfo: (salonData) => api.put('/admin/salon-info', salonData),
 };
 
 // ===== ADMIN - SERVICES =====
@@ -149,7 +155,6 @@ export const adminHoursAPI = {
 
 export const adminGalleryAPI = {
   getGallery: () => api.get('/admin/gallery'),
-  addImage: (imageData) => api.post('/admin/gallery', imageData),
   deleteImage: (id) => api.delete(`/admin/gallery/${id}`),
   uploadGalleryPhoto: (photoFile, title) => {
     const formData = new FormData();
@@ -157,11 +162,7 @@ export const adminGalleryAPI = {
     if (title) {
       formData.append('title', title);
     }
-    return api.post('/admin/gallery/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    return api.post('/admin/gallery/upload', formData);
   },
 };
 
