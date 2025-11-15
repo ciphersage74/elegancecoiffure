@@ -14,38 +14,59 @@ api.interceptors.request.use(
   (config) => {
     const headers = config.headers ?? {};
 
+    const normalizeKey = (key) =>
+      Object.keys(headers).find((existingKey) => existingKey.toLowerCase() === key.toLowerCase()) || key;
+
+    const setHeader = (key, value) => {
+      if (typeof headers.set === 'function') {
+        headers.set(key, value);
+      } else {
+        headers[normalizeKey(key)] = value;
+      }
+    };
+
+    const hasHeader = (key) => {
+      if (typeof headers.has === 'function') {
+        return headers.has(key);
+      }
+      return Object.keys(headers).some((existingKey) => existingKey.toLowerCase() === key.toLowerCase());
+    };
+
+    const getHeader = (key) => {
+      if (typeof headers.get === 'function') {
+        return headers.get(key);
+      }
+      const normalizedKey = normalizeKey(key);
+      return headers[normalizedKey];
+    };
+
+    const removeHeader = (key) => {
+      if (typeof headers.delete === 'function') {
+        headers.delete(key);
+      } else {
+        const normalizedKey = normalizeKey(key);
+        if (normalizedKey in headers) {
+          delete headers[normalizedKey];
+        }
+      }
+    };
+
     const token = localStorage.getItem('token');
     if (token) {
-      if (typeof headers.set === 'function') {
-        headers.set('Authorization', `Bearer ${token}`);
-      } else {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      setHeader('Authorization', `Bearer ${token}`);
     }
 
     const method = config.method?.toLowerCase();
     const isFormData = config.data instanceof FormData;
 
     if (isFormData) {
-      if (typeof headers.delete === 'function') {
-        headers.delete('Content-Type');
-      } else {
-        Object.keys(headers).forEach((key) => {
-          if (key.toLowerCase() === 'content-type') {
-            delete headers[key];
-          }
-        });
+      const contentType = getHeader('Content-Type');
+      if (!contentType || contentType.toLowerCase().includes('application/json')) {
+        removeHeader('Content-Type');
       }
     } else if (method && method !== 'get') {
-      if (typeof headers.set === 'function') {
-        const hasContentType =
-          (typeof headers.has === 'function' && headers.has('Content-Type')) ||
-          (typeof headers.get === 'function' && !!headers.get('Content-Type'));
-        if (!hasContentType) {
-          headers.set('Content-Type', 'application/json');
-        }
-      } else if (!Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
-        headers['Content-Type'] = 'application/json';
+      if (!hasHeader('Content-Type')) {
+        setHeader('Content-Type', 'application/json');
       }
     }
 
@@ -130,14 +151,22 @@ export const adminEmployeesAPI = {
   update: (id, employeeData) => api.put(`/admin/employees/${id}`, employeeData),
   delete: (id) => api.delete(`/admin/employees/${id}`),
   getEmployeeHours: (employeeId) => api.get(`/admin/employees/${employeeId}/hours`),
-  updateEmployeeHours: (employeeId, hoursData) => api.put(`/admin/employees/${employeeId}/hours`, hoursData),
- getEmployeeAvailability: (employeeId) => api.get(`/admin/employees/${employeeId}/availability`),
- addEmployeeAvailability: (employeeId, availabilityData) => api.post(`/admin/employees/${employeeId}/availability`, availabilityData),
- deleteEmployeeAvailability: (availabilityId) => api.delete(`/admin/availability/${availabilityId}`),
+  updateEmployeeHours: (employeeId, hoursData) =>
+    api.put(`/admin/employees/${employeeId}/hours`, hoursData),
+  getEmployeeAvailability: (employeeId) =>
+    api.get(`/admin/employees/${employeeId}/availability`),
+  addEmployeeAvailability: (employeeId, availabilityData) =>
+    api.post(`/admin/employees/${employeeId}/availability`, availabilityData),
+  deleteEmployeeAvailability: (availabilityId) =>
+    api.delete(`/admin/availability/${availabilityId}`),
   uploadEmployeePhoto: (employeeId, photoFile) => {
     const formData = new FormData();
     formData.append('photo', photoFile);
-    return api.post(`/admin/employees/${employeeId}/upload-photo`, formData);
+    return api.post(`/admin/employees/${employeeId}/upload-photo`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
 };
 
@@ -186,7 +215,11 @@ export const adminGalleryAPI = {
     if (title) {
       formData.append('title', title);
     }
-    return api.post('/admin/gallery/upload', formData);
+    return api.post('/admin/gallery/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
 };
 
