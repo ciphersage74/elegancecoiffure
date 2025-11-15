@@ -73,9 +73,12 @@ export const appointmentsAPI = {
 
 export const salonAPI = {
   getInfo: () => api.get('/salon/info'),
-  updateInfo: (salonData) => api.put('/salon/info', salonData),
   getGallery: () => api.get('/salon/gallery'),
   getHours: () => api.get('/salon/hours'),
+};
+
+export const adminSalonAPI = {
+  updateInfo: (salonData) => api.put('/admin/salon-info', salonData),
 };
 
 // ===== ADMIN - SERVICES =====

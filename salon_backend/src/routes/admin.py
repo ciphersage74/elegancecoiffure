@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 from src.models.models import db, User, Employee, Service, Appointment, BusinessHours, EmployeeHours, ClosedDate, Gallery, employee_services, EmployeeAvailability
 from datetime import time
 from werkzeug.utils import secure_filename
+from src.cache import cache
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -928,39 +929,40 @@ def update_salon_info():
             db.session.add(salon_info)
         
         # Mettre à jour les champs
-        if 'name' in data:
-            salon_info.name = data['name']
-        if 'description' in data:
-            salon_info.description = data['description']
-        if 'address' in data:
-            salon_info.address = data['address']
-        if 'city' in data:
-            salon_info.city = data['city']
-        if 'postal_code' in data:
-            salon_info.postal_code = data['postal_code']
-        if 'country' in data:
-            salon_info.country = data['country']
-        if 'phone' in data:
-            salon_info.phone = data['phone']
-        if 'email' in data:
-            salon_info.email = data['email']
-        if 'website' in data:
-            salon_info.website = data['website']
-        if 'facebook_url' in data:
-            salon_info.facebook_url = data['facebook_url']
-        if 'instagram_url' in data:
-            salon_info.instagram_url = data['instagram_url']
-        if 'booking_advance_days' in data:
-            salon_info.booking_advance_days = data['booking_advance_days']
-        if 'booking_cancel_hours' in data:
-            salon_info.booking_cancel_hours = data['booking_cancel_hours']
-        if 'slot_duration' in data:
-            salon_info.slot_duration = data['slot_duration']
-        if 'logo_url' in data:
-            salon_info.logo_url = data['logo_url']
-        
+        allowed_fields = [
+            'name',
+            'description',
+            'address',
+            'city',
+            'postal_code',
+            'country',
+            'phone',
+            'email',
+            'website',
+            'facebook_url',
+            'instagram_url',
+            'booking_advance_days',
+            'booking_cancel_hours',
+            'slot_duration',
+            'logo_url'
+        ]
+
+        for field in allowed_fields:
+            if field in data and hasattr(salon_info, field):
+                value = data[field]
+                if field in {'booking_advance_days', 'booking_cancel_hours', 'slot_duration'}:
+                    try:
+                        value = int(value) if value is not None else None
+                    except (TypeError, ValueError):
+                        continue
+
+                setattr(salon_info, field, value)
+
         db.session.commit()
-        
+
+        # Invalider le cache pour refléter les dernières informations côté public
+        cache.clear()
+
         return jsonify({
             'message': 'Informations mises à jour',
             'salon_info': salon_info.to_dict()
